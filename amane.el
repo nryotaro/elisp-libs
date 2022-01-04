@@ -8,6 +8,11 @@
   "Check wheter amane config file that contains the paths of CMakeLists.txts."
   (file-exists-p amane-projects-file))
 
+(defun amane-clear-projects ()
+  "Delete all projects."
+  (setq amane-projects nil))
+
+
 (defun amane-init-amane-projects-file ()
   "Initialize amane-projects-file."
   (with-temp-file amane-projects-file
@@ -20,13 +25,13 @@
     (unless (equal filename "CMakeLists.txt")	
       (throw 'anamae-invalid-cmakelists cmakelists))
     (add-to-list 'amane-projects (cons (file-truename cmakelists)
-				       (list (list (cons :root (file-truename project-root))
-						   (cons :build (file-truename build-dir))))))))
+				       (list (cons :root (file-truename project-root))
+						   (cons :build (file-truename build-dir)))))))
 
 (defun amane-save-projects ()
   "Save amane-projects."
   (with-temp-file amane-projects-file
-    (insert (amane-pretty-string `(setq amane-projects ,amane-projects)))))
+    (insert (amane-pretty-string `(setq amane-projects ',amane-projects)))))
 
 
 (defun amane-delete-cmakelists (cmakelists)
@@ -45,12 +50,13 @@
     (pp obj stream)
     (apply #'string (reverse strs))))
 
-(defun amane-load-amane-projects ()
+(defun amane-load-projects ()
   "Read amane-projects."
   (if (amane-project-file-exist-p)
       (load-file amane-projects-file)))
 
 (defun amane-generate-makefile ()
+  "Generate the Makefile by running cmake <src>."
   (interactive)
   (let ((project (assoc (file-truename (buffer-file-name)) amane-projects)))
     (message "%s" project)
@@ -67,6 +73,10 @@
 
 (defun amane ()
   (message "amane"))
+
+;(catch 'doge
+;  (throw 'doge "a")
+;  1)
 
 ;(defvar-local a "dog")
 ;(defvar-local foo "fo")
