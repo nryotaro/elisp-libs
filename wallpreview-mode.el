@@ -1,5 +1,22 @@
 (require 'image-dired)
 
+(defgroup wallpreview-mode nil
+  "Set wallpapers with image-dired."
+  :prefix "wallpreview-mode-")
+
+(defun wallpreview-mode-sway-bg (filename)
+  (concat "swaymsg output \"*\" bg \""
+	  (shell-quote-argument wallpaper-path)
+	  "\" fill"))
+
+
+(defcustom wallpreview-mode-wallpaper-cmd
+  'wallpreview-mode-sway-bg
+  "A function that takes a filename and return 
+the command that sets the image to wallpaper."
+  :type 'function
+  )
+
 (defvar wallpreview-wallpaper-directory "~/Pictures"
   "Wallpapers directory.")
 
@@ -8,9 +25,12 @@
   (interactive "fBackground image: ")
   (let ((wallpaper-path (or arg (image-dired-original-file-name))))
     (call-process-shell-command
-     ; shell-quote-argument replaces ~ with \~
-     (concat "mywall " (shell-quote-argument wallpaper-path) "&")
+     (concat (apply wallpreview-mode-wallpaper-cmd (list wallpaper-path)) "&")
      nil 0)))
+
+(defun wallpreview-mode-wallpaper-set
+    (a)
+  (wallpreview-mode-wallpaper-set-fn a))
 
 (defun wallpreview-set-wallpaper-after (&rest arg)
   "Use walpreview-set-wallpaper. This function is an after adivce for image-dired-[forward, backward]-image, image-dired-[previous, next]-line."
