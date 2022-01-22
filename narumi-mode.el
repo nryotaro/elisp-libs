@@ -25,17 +25,29 @@
     (set-window-buffer (selected-window)
 		       buffer-name)))
 
-(defun narumi-calc-scale-window-height (height-pixel ratio)
-  "Return a scale to make the size of an image is ratio * (frame-pixel-height).
-height is the height in pixel of an image."
-  (let* ((frame-height (frame-pixel-height))
-	 (max-height (* frame-height ratio)))
-    (if (<= height-pixel max-height)
-	1.0
-      (/ (* frame-height ratio) height-pixel))))
 
-(defun narumi-update-image-scale (image new-scale)
-  "Take an object returrned by create-image, returning the new object with new-scale attribute."
+
+
+(defun narumi-mode-calc-scale
+    (image-width image-height width height max-height-ratio)
+  "Take width and height of an image,
+width and height of area for narumi and max-height-ratio
+to calc the scale that let image be in width height * max-height-ratio area.
+the range of max-height-ratio is (0 1), the sizes are in pixel."
+  (let ((height-bound (* height max-height-ratio))
+	(width-bound (* 0.9 width)))
+    (if (<= image-width width-bound)
+	(if (<= image-height height-bound)
+	    1.0
+	  (/ height-bound image-height))
+      (if (<= image-height height-bound)
+	 ; width-bound < image-width
+	(/ width-bound image-width)
+	(min (/ height-bound image-height)
+	     (/ width-bound image-width))))))
+
+(defun narumi-mode-update-image-scale (image new-scale)
+  "Take an object returned by create-image, returning the new object with new-scale attribute."
   (let* ((scale-tag-pos (seq-position image :scale)))
     (if scale-tag-pos
 	(seq-map-indexed (lambda (item i)
@@ -45,22 +57,28 @@ height is the height in pixel of an image."
 		   image)
       (append image (list :scale new-scale)))))
 
-(defun narumi-create-center-image (file-path)
-  "Create an image object that nser-image can accepts. The returned object can contains the margin attribute."
+(defun narumi-mode-create-center-image (file-path)
+  "Create an image object that insert-image can accept. The returned object can contain the margin attribute."
   (let* ((image (create-image (expand-file-name file-path)))
-	 (original-height (cdr (image-size image t)))
-	 (new-scale (narumi-calc-scale-window-height original-height 0.4))
-	 (resized-image (narumi-update-image-scale image new-scale))
+	 (image-width (car (image-size image t)))	 
+	 (image-height (cdr (image-size image t)))
+	 (new-scale (narumi-mode-calc-scale image-width
+					    image-height
+					    (window-pixel-width)
+					    (frame-pixel-height)
+					    0.4))
+	 (resized-image (narumi-mode-update-image-scale image new-scale))
 	 (resized-width (car (image-size resized-image t)))
 	 (window-width (window-body-width nil t))
 	 (width-margin (if (<= window-width resized-width)
 			   0
 			 (/ (- window-width resized-width) 2))))
-    (append resized-image (list :margin (cons (- width-margin 25) 10)))))
+    (append resized-image (list :margin
+				(cons width-margin 10)))))
 
 
-(defun narumi-find-image-files ()
-  ""
+(defun narumi-mode-find-image-files ()
+  "Return image jpeg or png image files in narumi-mode-image-directory."
   (seq-filter (lambda (entry)		 
 		(let ((len (length entry)))
 		  (if (<= 4 len)
@@ -71,14 +89,14 @@ height is the height in pixel of an image."
 			    (equal "jpg" ext))))))
 	      (directory-files narumi-mode-image-directory)))
 
-(defun narumi-put-image ()
-  ""
-  (let* ((images (narumi-find-image-files))
-	(image (expand-file-name (nth (random (length images)) images)
-				 narumi-mode-image-directory)))
-    (insert-image (narumi-create-center-image image))))
+(defun narumi-mode-put-image ()
+  "Insert an image into the buffer."
+  (let* ((images (narumi-mode-find-image-files))
+	 (image (expand-file-name (nth (random (length images)) images)
+				  narumi-mode-image-directory)))
+    (insert-image (narumi-mode-create-center-image image))))
 
-(defun narumi-jump-entry ()
+(defun narumi-mode-jump-entry ()
   ""
   (interactive)
   (let ((text-properties (text-properties-at (point))))
@@ -86,16 +104,16 @@ height is the height in pixel of an image."
 	    (find-file (nth (+ 1 (seq-position text-properties 'entry-value))
 			    text-properties)))))
 
-(defun narumi-insert-entry (title path)
+(defun narumi-mode-insert-entry (title path)
   ""
   (let ((map (make-sparse-keymap)))
-    (bind-key "RET" 'narumi-jump-entry map)
+    (bind-key "RET" 'narumi-mode-jump-entry map)
     (insert "  ◯ ")
     (insert (propertize title 'face 'button 'entry-value path 'keymap map))
     (insert "\n") ;(newline) can append '_' to the paths.
     ))
 
-(defun narumi-list-bookmarks ()
+(defun narumi-mode-list-bookmarks ()
   "Return the paths of the bookmarks."
   (with-current-buffer (get-buffer-create bookmark-bmenu-buffer)
       (list-bookmarks))
@@ -103,7 +121,7 @@ height is the height in pixel of an image."
 	  (cdr (assoc 'filename (cdr x))))
 	  bookmark-alist))
 
-(defun narumi-insert-title (title)
+(defun narumi-mode-insert-title (title)
   (add-text-properties 0
 		       (length title)
 		       '(face bookmark-menu-heading display (height 1.2))
@@ -118,17 +136,17 @@ height is the height in pixel of an image."
   (erase-buffer)
   (goto-line 0)
   (if (getenv "PRIVATE")
-      (narumi-put-image))
+      (narumi-mode-put-image))
   (newline)
-  (narumi-insert-title "Bookmarks")
+  (narumi-mode-insert-title "Bookmarks")
   (newline)
-  (dolist (bookmark-path (narumi-list-bookmarks))
-    (narumi-insert-entry bookmark-path bookmark-path))
+  (dolist (bookmark-path (narumi-mode-list-bookmarks))
+    (narumi-mode-insert-entry bookmark-path bookmark-path))
   (newline)    
-  (narumi-insert-title "Recent files")
+  (narumi-mode-insert-title "Recent files")
   (newline)
   (dolist (recent-file recentf-list)
-    (narumi-insert-entry recent-file recent-file))
+    (narumi-mode-insert-entry recent-file recent-file))
   (goto-line 3)
   (setq buffer-read-only t))
 
