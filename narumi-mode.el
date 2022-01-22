@@ -1,14 +1,24 @@
 ;;;
 ;;; https://www.gnu.org/software/emacs/manual/html_node/elisp/Image-Descriptors.html
 ;;;
-(defvar narumi-buffer-name "*narumi*" "The buffer name of narumi-mode")
-					;(defvar narumi-image-directory "~/wallpapers/private" "")
-(defvar narumi-image-directory "~/Pictures" "A directory where picures are.")
+(defgroup narumi-mode nil
+  "Yet another splash screen."
+  :prefix "narumi-mode-")
 
-(defun narumi ()
+(defcustom narumi-mode-buffer-name
+  "*narumi*"
+  "The buffer name of narumi-mode"
+  :type 'string)
+
+(defcustom narumi-mode-image-directory
+  "*narumi*"
+  "A directory where images s are."
+  :type 'string)
+
+(defun narumi-mode-display ()
   "Set the buffer of narumi-mode to the current window."
   (interactive)
-  (let ((buffer-name narumi-buffer-name))
+  (let ((buffer-name narumi-mode-buffer-name))
     (get-buffer-create buffer-name)
     (with-current-buffer buffer-name
       (narumi-mode))
@@ -59,13 +69,13 @@ height is the height in pixel of an image."
 			(or (equal "jpeg" jpeg)
 			    (equal "png" ext)
 			    (equal "jpg" ext))))))
-	      (directory-files narumi-image-directory)))
+	      (directory-files narumi-mode-image-directory)))
 
 (defun narumi-put-image ()
   ""
   (let* ((images (narumi-find-image-files))
 	(image (expand-file-name (nth (random (length images)) images)
-				 narumi-image-directory)))
+				 narumi-mode-image-directory)))
     (insert-image (narumi-create-center-image image))))
 
 (defun narumi-jump-entry ()
@@ -100,12 +110,13 @@ height is the height in pixel of an image."
 		       title)
   (insert title))
 
-(defun narumi-refresh ()
+(defun narumi-mode-refresh ()
   "Refresh the *narumi* buffer."
   (interactive)
+  (recentf-mode t)  
   (setq buffer-read-only nil)
- (erase-buffer)
-  (goto-line 0)  
+  (erase-buffer)
+  (goto-line 0)
   (if (getenv "PRIVATE")
       (narumi-put-image))
   (newline)
@@ -116,7 +127,6 @@ height is the height in pixel of an image."
   (newline)    
   (narumi-insert-title "Recent files")
   (newline)
-  (recentf-mode t)
   (dolist (recent-file recentf-list)
     (narumi-insert-entry recent-file recent-file))
   (goto-line 3)
@@ -124,8 +134,8 @@ height is the height in pixel of an image."
 
 (define-derived-mode narumi-mode
   special-mode "narumi"
-  "description"
-  (bind-key "r" 'narumi-refresh narumi-mode-map)
-  (narumi-refresh))
+  "Display the links to locations you may visit."
+  (bind-key "r" 'narumi-mode-refresh narumi-mode-map)
+  (narumi-mode-refresh))
 
 (provide 'narumi-mode)
