@@ -25,9 +25,6 @@
     (set-window-buffer (selected-window)
 		       buffer-name)))
 
-
-
-
 (defun narumi-mode-calc-scale
     (image-width image-height width height max-height-ratio)
   "Take width and height of an image,
