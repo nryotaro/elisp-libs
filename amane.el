@@ -55,8 +55,17 @@
   (if (amane-project-file-exist-p)
       (load-file amane-projects-file)))
 
+(defun amane-recursive-dirs (leaf-dir)
+  "TODO write docs and test"
+  (let* ((dir (expand-file-name (directory-file-name leaf-dir)))
+	 (res nil))
+    (while (not (equal "/" dir))
+      (setq res (cons dir res))
+      (setq dir (directory-file-name (file-name-directory dir))))
+    (cons "/" res)))
+
 (defun amane-generate-makefile ()
-  "Generate the Makefile by running cmake <src>."
+  "Generate the Makefile by running cmake <src>. TODO try-catch"
   (interactive)
   (let ((project (assoc (file-truename (buffer-file-name)) amane-projects)))
     (message "%s" project)
@@ -82,9 +91,9 @@
 ;(defvar-local foo "fo")
 
 ;(with-current-buffer "*scratch*"
-;					;(defvar-local b "c")
-;  (setq-local b "3")
-					;  )
-					;https://ayatakesi.github.io/emacs/24.5/elisp_html/Minibuffer-Completion.html
+;;(defvar-local b "c")
+; (setq-local b "3")
+;  )
+;https://ayatakesi.github.io/emacs/24.5/elisp_html/Minibuffer-Completion.html
 
 (provide 'amane)
