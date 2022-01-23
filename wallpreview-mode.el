@@ -16,7 +16,7 @@ the command that sets the image to wallpaper."
   "Wallpapers directory."
   :type 'directory)
 
-(defun wallpreview-mode-sway-bg (filename)
+(defun wallpreview-mode-sway-bg (wallpaper-path)
   (concat "swaymsg output \"*\" bg \""
 	  (shell-quote-argument wallpaper-path)
 	  "\" fill"))
