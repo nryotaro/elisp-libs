@@ -15,6 +15,28 @@
   "A directory where images s are."
   :type 'string)
 
+(defcustom narumi-mode-wallpaper-cmd
+  'narumi-mode-sway-bg
+  "A function that takes a filename and return 
+the command that sets the image to wallpaper."
+  :type 'function
+  )
+
+(defun narumi-mode-sway-bg (wallpaper-path)
+  (concat "swaymsg output \"*\" bg \""
+	  (shell-quote-argument wallpaper-path)
+	  "\" fill"))
+
+(defun narumi-mode-set-wallpaper ()
+  "Set a background image."
+  (interactive)
+  (let* ((text-properties (text-properties-at (point)))
+	 (wallpaper-path (nth (+ 1 (seq-position text-properties 'image-path))
+			      text-properties)))
+    (call-process-shell-command
+     (concat (apply narumi-mode-wallpaper-cmd (list wallpaper-path)) "&")
+     nil 0)))
+
 (defun narumi-mode-display ()
   "Set the buffer of narumi-mode to the current window."
   (interactive)
@@ -90,11 +112,18 @@ the range of max-height-ratio is (0 1), the sizes are in pixel."
   "Insert an image into the buffer."
   (let* ((images (narumi-mode-find-image-files))
 	 (image (expand-file-name (nth (random (length images)) images)
-				  narumi-mode-image-directory)))
-    (insert-image (narumi-mode-create-center-image image))))
+				  narumi-mode-image-directory))
+	 (map (make-sparse-keymap)))
+    (bind-key "RET" 'narumi-mode-set-wallpaper map)
+    (insert-image (narumi-mode-create-center-image image))
+    (newline)
+    (insert (propertize "Set the image as the wallpaper." 'face 'button 'image-path image 'keymap map))
+    (insert "\n")
+    (newline)
+    ))
 
 (defun narumi-mode-jump-entry ()
-  ""
+  "Open a file that the cursor is on."
   (interactive)
   (let ((text-properties (text-properties-at (point))))
 	(if text-properties
@@ -134,7 +163,7 @@ the range of max-height-ratio is (0 1), the sizes are in pixel."
   (goto-line 0)
   (if (getenv "PRIVATE")
       (narumi-mode-put-image))
-  (newline)
+  ;(newline)
   (narumi-mode-insert-title "Bookmarks")
   (newline)
   (dolist (bookmark-path (narumi-mode-list-bookmarks))
