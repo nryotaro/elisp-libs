@@ -38,7 +38,7 @@
   :group 'wallpreview)
 
 (defcustom wallpreview-wallpaper-cmd
-  #'wallpreview-sway-bg
+  #'wallpreview--sway-bg
   "A function that take a file path, and change the wallpaper."
   :type 'function)
 
@@ -52,13 +52,20 @@
   "Specify `wallpreview-toggle' key."
   :type 'key-sequence)
 
-(defun wallpreview-sway-bg (wallpaper-path)
+(defun wallpreview-open-wallpaper-directory
+    ()
+  "Open `wallpreview-wallpaper-directory' with `image-dired'."
+  (interactive)
+  (image-dired wallpreview-wallpaper-directory)
+  (wallpreview--enable))
+
+(defun wallpreview--sway-bg (wallpaper-path)
   "Change the backgrounds to the content of WALLPAPER-PATH."
   (concat "swaymsg output \"*\" bg \""
 	  (shell-quote-argument wallpaper-path)
 	  "\" fill"))
 
-(defun wallpreview-set-wallpaper (&optional arg)
+(defun wallpreview--set-wallpaper (&optional arg)
   "Set a background as ARG.
 If arg is nil, use the forcused image."
   (interactive "fBackground image: ")
@@ -67,72 +74,56 @@ If arg is nil, use the forcused image."
      (concat (apply wallpreview-wallpaper-cmd (list wallpaper-path)) "&")
      nil 0)))
 
-(defun wallpreview-set-wallpaper-after
+(defun wallpreview--set-wallpaper-after
     (&rest _)
   "A Callback function.
 This function is an after adivce for
 image-dired-[forward, backward]-image, image-dired-[previous, next]-line."
-  (wallpreview-set-wallpaper))
+  (wallpreview--set-wallpaper))
 
-(defun wallpreview-image-dired-track-thumbnail ()
-  "Sync the pointer in the image-dired-thumbnail buffer with."
-  (interactive)
-  (image-dired-track-thumbnail))
-
-(defun wallpreview-open-wallpaper-directory
-    ()
-  "Open `wallpreview-wallpaper-directory' with `image-dired'."
-  (interactive)
-  (image-dired wallpreview-wallpaper-directory))
-
-(defun wallpreview-enable ()
-  "Turn on wallpreview."
-  
-  (advice-add #'image-dired-forward-image
-	      :after #'wallpreview-set-wallpaper-after)
-  (advice-add #'image-dired-backward-image
-	      :after #'wallpreview-set-wallpaper-after)
-  (advice-add #'image-dired-previous-line
-	      :after #'wallpreview-set-wallpaper-after)
-  (advice-add #'image-dired-next-line
-	      :after #'wallpreview-set-wallpaper-after))
-
-(defun wallpreview-disable ()
-  "Turn off wallpreview."
-  (advice-remove #'image-dired-forward-image
-		 #'wallpreview-set-wallpaper-after)
-  (advice-remove #'image-dired-backward-image
-		 #'wallpreview-set-wallpaper-after)
-  (advice-remove #'image-dired-previous-line
-		 #'wallpreview-set-wallpaper-after)
-  (advice-remove #'image-dired-next-line
-		 #'wallpreview-set-wallpaper-after))
-
-(defvar wallpreview-on nil
+(defvar wallpreview--on nil
   "If the value is not nil, wallpreivew is enabled.")
 
-(defun wallpreview-toggle
+(defun wallpreview--enable ()
+  "Turn on wallpreview."
+  (dolist (target (list #'image-dired-forward-image
+			#'image-dired-backward-image
+			#'image-dired-previous-line
+			#'image-dired-next-line))
+    (advice-add target
+		:after
+		#'wallpreview--set-wallpaper-after))
+  (setq wallpreview--on t)
+  (message "wallpreview is on."))
+
+(defun wallpreview--disable ()
+  "Turn off wallpreview."
+  (dolist (target (list #'image-dired-forward-image
+			#'image-dired-backward-image
+			#'image-dired-previous-line
+			#'image-dired-next-line))
+    (advice-remove target
+		   #'wallpreview--set-wallpaper-after))
+  (setq wallpreview--on nil)
+  (message "wallpreview is off."))
+
+(defun wallpreview--toggle
     ()
   "Toggle wallpreview."
   (interactive)
-  (if wallpreview-on
-      (progn (wallpreview-disable)
-	     (setq wallpreview-on nil)
-	     (message "wallpreview is off."))
-    (progn
-      (wallpreview-enable)
-      (setq wallpreview-on t)
-      (message "wallpreview is on."))))
+  (if wallpreview--on
+      (wallpreview--disable)
+    (wallpreview--enable)))
 
-(defun wallpreview-bind-toggle-key ()
+(defun wallpreview--bind-toggle-key ()
     "Toggle wallpreview."
     (define-key
       image-dired-thumbnail-mode-map
       wallpreview-toggle-key
-      #'wallpreview-toggle))
+      #'wallpreview--toggle))
 
 (add-hook 'image-dired-thumbnail-mode-hook
-	  #'wallpreview-bind-toggle-key)
+	  #'wallpreview--bind-toggle-key)
 
 (provide 'wallpreview)
 ;;; wallpreview.el ends here
