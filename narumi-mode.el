@@ -1,58 +1,110 @@
-;;;
-;;; https://www.gnu.org/software/emacs/manual/html_node/elisp/Image-Descriptors.html
-;;;
+;;; narumi-mode.el --- A dashboard that displays a ramdom sampled image -*- lexical-binding: t -*-
+
+;; Copyright (C) 2022 Nakamura, Ryotaro <nakamura.ryotaro.kzs@gmail.com>
+;; Version: 1.0.0
+;; Package-Requires: ((emacs "26.1"))
+;; URL: https://github.com/nryotaro/narumi
+;; This file is not part of GNU Emacs.
+
+;; This program is free software; you can redistribute it and/or
+;; modify it under the terms of the GNU General Public License
+;; as published by the Free Software Foundation; either version 3
+;; of the License, or (at your option) any later version.
+
+;; This program is distributed in the hope that it will be useful,
+;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;; GNU General Public License for more details.
+
+;; You should have received a copy of the GNU General Public License
+;; along with this program; if not, write to the Free Software
+;; Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
+;; 02110-1301, USA.
+
+;;; Commentary:
+
+;; narumi-mode is a major mode that shows a dashboard as a splash screen.
+;; It shows random sampled image in a directry, bookmarks, and recent files.
+;; You can change the wallpaper to the image on the dashboard.
+;; Since it is a dashboard,
+;; you can go to the entries of bookmarks and recent files by clicking them.
+(require 'bookmark)
+(require 'recentf)
+(require 'seq)
+
+;;; Code:
 (defgroup narumi-mode nil
   "Yet another splash screen."
-  :prefix "narumi-mode-")
+  :prefix "narumi-"
+  :group 'narumi)
 
-(defcustom narumi-mode-buffer-name
+(defcustom narumi-buffer-name
   "*narumi*"
-  "The buffer name of narumi-mode"
+  "The buffer name of `narumi-mode'."
   :type 'string)
 
-(defcustom narumi-mode-image-directory
-  "*narumi*"
-  "A directory where images s are."
+(defcustom narumi-image-directory
+  "~/Pictures"
+  "A directory where images are."
   :type 'string)
 
-(defcustom narumi-mode-wallpaper-cmd
-  'narumi-mode-sway-bg
-  "A function that takes a filename and return 
-the command that sets the image to wallpaper."
-  :type 'function
-  )
+(defcustom narumi-wallpaper-cmd
+  'narumi--sway-bg
+  "Sets the background as the image at the file path."
+  :type 'function)
 
-(defun narumi-mode-sway-bg (wallpaper-path)
+(defcustom narumi-display-image
+  t
+  "Display an image if the variable is bound to not nil."
+  :type 'boolean)
+
+(defun narumi-display-on-startup
+    ()
+  "Display narumi on startup."
+  (add-hook 'emacs-startup-hook
+	    #'narumi--display))
+
+(defun narumi--sway-bg (wallpaper-path)
+  "Use the image at `WALLPAPER-PATH' as the wallpaper.
+This works for sway users."
   (concat "swaymsg output \"*\" bg \""
 	  (shell-quote-argument wallpaper-path)
 	  "\" fill"))
 
-(defun narumi-mode-set-wallpaper ()
-  "Set a background image."
+(defun narumi--set-wallpaper ()
+  "Set a image as the wallpaper."
   (interactive)
   (let* ((text-properties (text-properties-at (point)))
-	 (wallpaper-path (nth (+ 1 (seq-position text-properties 'image-path))
+	 (wallpaper-path (nth (+ 1
+				 (seq-position text-properties
+					       'image-path))
 			      text-properties)))
     (call-process-shell-command
-     (concat (apply narumi-mode-wallpaper-cmd (list wallpaper-path)) "&")
-     nil 0)))
+     (concat
+      (apply narumi-wallpaper-cmd
+	     (list wallpaper-path))
+      "&")
+     nil
+     0)))
 
-(defun narumi-mode-display ()
-  "Set the buffer of narumi-mode to the current window."
+(defun narumi--display ()
+  "Display the buffer of `narumi-mode' on the current window."
   (interactive)
-  (let ((buffer-name narumi-mode-buffer-name))
+  (let ((buffer-name narumi-buffer-name))
     (get-buffer-create buffer-name)
     (with-current-buffer buffer-name
       (narumi-mode))
     (set-window-buffer (selected-window)
 		       buffer-name)))
 
-(defun narumi-mode-calc-scale
+(defun narumi--calc-scale
     (image-width image-height width height max-height-ratio)
-  "Take width and height of an image,
-width and height of area for narumi and max-height-ratio
-to calc the scale that let image be in width height * max-height-ratio area.
-the range of max-height-ratio is (0 1), the sizes are in pixel."
+  "Calculate an appropriate scale of a image.
+Take width(`IMAGE-WIDTH') and height(`IMAGE-HEIGHT') of an image,
+`WIDTH' and `HEIGHT' of area for narumi and `MAX-HEIGHT-RATIO'
+to calculate the scale that let image be in
+`WIDTH' x (`HEIGHT' * `MAX-HEIGHT-RATIO') area.
+the range of `MAX-HEIGHT-RATIO' is (0 1), the sizes are in pixel."
   (let ((height-bound (* height max-height-ratio))
 	(width-bound (* 0.9 width)))
     (if (<= image-width width-bound)
@@ -65,8 +117,10 @@ the range of max-height-ratio is (0 1), the sizes are in pixel."
 	(min (/ height-bound image-height)
 	     (/ width-bound image-width))))))
 
-(defun narumi-mode-update-image-scale (image new-scale)
-  "Take an object returned by create-image, returning the new object with new-scale attribute."
+(defun narumi--update-image-scale (image new-scale)
+  "Update the value of `IMAGE' with `NEW-SCALE'.
+Take `IMAGE' returned by `create-image',
+returning the new object with (:scale `NEW-SCALE')."
   (let* ((scale-tag-pos (seq-position image :scale)))
     (if scale-tag-pos
 	(seq-map-indexed (lambda (item i)
@@ -76,29 +130,33 @@ the range of max-height-ratio is (0 1), the sizes are in pixel."
 		   image)
       (append image (list :scale new-scale)))))
 
-(defun narumi-mode-create-center-image (file-path)
-  "Create an image object that insert-image can accept. The returned object can contain the margin attribute."
+(defun narumi--create-center-image (file-path)
+  "Create an image at `FILE-PATH' that `insert-image' can accept.
+The returned object can contain the margin attribute."
   (let* ((image (create-image (expand-file-name file-path)))
-	 (image-width (car (image-size image t)))	 
+	 (image-width (car (image-size image t)))
 	 (image-height (cdr (image-size image t)))
-	 (new-scale (narumi-mode-calc-scale image-width
-					    image-height
-					    (window-pixel-width)
-					    (frame-pixel-height)
-					    0.4))
-	 (resized-image (narumi-mode-update-image-scale image new-scale))
+	 (new-scale (narumi--calc-scale image-width
+					image-height
+					(window-pixel-width)
+					(frame-pixel-height)
+					0.4))
+	 (resized-image (narumi--update-image-scale
+			 image
+			 new-scale))
 	 (resized-width (car (image-size resized-image t)))
 	 (window-width (window-body-width nil t))
 	 (width-margin (if (<= window-width resized-width)
 			   0
-			 (/ (- window-width resized-width) 2))))
+			 (/ (- window-width resized-width)
+			    2))))
     (append resized-image (list :margin
 				(cons width-margin 10)))))
 
 
-(defun narumi-mode-find-image-files ()
+(defun narumi--find-image-files ()
   "Return image jpeg or png image files in narumi-mode-image-directory."
-  (seq-filter (lambda (entry)		 
+  (seq-filter (lambda (entry)
 		(let ((len (length entry)))
 		  (if (<= 4 len)
 		      (let ((jpeg (substring entry -4))
@@ -106,80 +164,100 @@ the range of max-height-ratio is (0 1), the sizes are in pixel."
 			(or (equal "jpeg" jpeg)
 			    (equal "png" ext)
 			    (equal "jpg" ext))))))
-	      (directory-files narumi-mode-image-directory)))
+	      (directory-files narumi-image-directory)))
 
-(defun narumi-mode-put-image ()
+(defun narumi--put-image ()
   "Insert an image into the buffer."
-  (let* ((images (narumi-mode-find-image-files))
-	 (image (expand-file-name (nth (random (length images)) images)
-				  narumi-mode-image-directory))
+  (let* ((images (narumi--find-image-files))
+	 (image (expand-file-name (nth (random
+					(length images))
+				       images)
+				  narumi-image-directory))
 	 (map (make-sparse-keymap)))
-    (bind-key "RET" 'narumi-mode-set-wallpaper map)
-    (insert-image (narumi-mode-create-center-image image))
+    (define-key map (kbd "RET") #'narumi--set-wallpaper)
+    (insert-image (narumi--create-center-image image))
     (newline)
-    (insert (propertize "Set the image as the wallpaper." 'face 'button 'image-path image 'keymap map))
+    (insert (propertize "Set the image as the wallpaper."
+			'face
+			'button
+			'image-path
+			image
+			'keymap
+			map))
     (insert "\n")
-    (newline)
-    ))
+    (newline)))
 
-(defun narumi-mode-jump-entry ()
+(defun narumi--jump-entry ()
   "Open a file that the cursor is on."
   (interactive)
   (let ((text-properties (text-properties-at (point))))
 	(if text-properties
-	    (find-file (nth (+ 1 (seq-position text-properties 'entry-value))
+	    (find-file (nth (+ 1 (seq-position
+				  text-properties
+				  'entry-value))
 			    text-properties)))))
 
-(defun narumi-mode-insert-entry (title path)
-  ""
+(defun narumi--insert-entry (title path)
+  "Insert a `TITLE' that is linked to `PATH'."
   (let ((map (make-sparse-keymap)))
-    (bind-key "RET" 'narumi-mode-jump-entry map)
+    (define-key map (kbd "RET") #'narumi--jump-entry)
     (insert "  ◯ ")
-    (insert (propertize title 'face 'button 'entry-value path 'keymap map))
+    (insert (propertize title
+			'face
+			'button
+			'entry-value
+			path
+			'keymap
+			map))
     (insert "\n") ;(newline) can append '_' to the paths.
     ))
 
-(defun narumi-mode-list-bookmarks ()
+(defun narumi--list-bookmarks ()
   "Return the paths of the bookmarks."
-  (with-current-buffer (get-buffer-create bookmark-bmenu-buffer)
-      (list-bookmarks))
+  (with-current-buffer (get-buffer-create
+			bookmark-bmenu-buffer)
+    (list-bookmarks))
   (mapcar (lambda (x)
 	  (cdr (assoc 'filename (cdr x))))
 	  bookmark-alist))
 
-(defun narumi-mode-insert-title (title)
+(defun narumi--insert-title (title)
+  "Add a headline `TITLE'."
   (add-text-properties 0
 		       (length title)
-		       '(face bookmark-menu-heading display (height 1.2))
+		       '(face bookmark-menu-heading
+			      display
+			      (height 1.2))
 		       title)
   (insert title))
 
-(defun narumi-mode-refresh ()
+(defun narumi--refresh ()
   "Refresh the *narumi* buffer."
   (interactive)
-  (recentf-mode t)  
+  (recentf-mode t)
   (setq buffer-read-only nil)
   (erase-buffer)
-  (goto-line 0)
-  (if (getenv "PRIVATE")
-      (narumi-mode-put-image))
+  (forward-line 0)
+  (if narumi-display-image
+      (narumi--put-image))
   ;(newline)
-  (narumi-mode-insert-title "Bookmarks")
+  (narumi--insert-title "Bookmarks")
   (newline)
-  (dolist (bookmark-path (narumi-mode-list-bookmarks))
-    (narumi-mode-insert-entry bookmark-path bookmark-path))
-  (newline)    
-  (narumi-mode-insert-title "Recent files")
+  (dolist (bookmark-path (narumi--list-bookmarks))
+    (narumi--insert-entry bookmark-path bookmark-path))
+  (newline)
+  (narumi--insert-title "Recent files")
   (newline)
   (dolist (recent-file recentf-list)
-    (narumi-mode-insert-entry recent-file recent-file))
-  (goto-line 3)
+    (narumi--insert-entry recent-file recent-file))
+  (forward-line 3)
   (setq buffer-read-only t))
 
 (define-derived-mode narumi-mode
   special-mode "narumi"
   "Display the links to locations you may visit."
-  (bind-key "r" 'narumi-mode-refresh narumi-mode-map)
-  (narumi-mode-refresh))
+  (define-key narumi-mode-map "r" #'narumi--refresh)
+  (narumi--refresh))
 
 (provide 'narumi-mode)
+;;; narumi-mode.el ends here
