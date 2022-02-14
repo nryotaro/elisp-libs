@@ -1,4 +1,4 @@
-;;; wallpreview.el --- Update wallpapers with image-dired -*- lexical-binding: t -*-
+;;; wallpreview.el --- Set wallpapers with image-dired -*- lexical-binding: t -*-
 
 ;; Copyright (C) 2022 Nakamura, Ryotaro <nakamura.ryotaro.kzs@gmail.com>
 ;; Version: 1.0.0
@@ -67,7 +67,7 @@
 
 (defun wallpreview--set-wallpaper (&optional arg)
   "Set a background as ARG.
-If arg is nil, use the forcused image."
+If arg is nil, use the focused image."
   (interactive "fBackground image: ")
   (let ((wallpaper-path (or arg (image-dired-original-file-name))))
     (call-process-shell-command
@@ -77,12 +77,12 @@ If arg is nil, use the forcused image."
 (defun wallpreview--set-wallpaper-after
     (&rest _)
   "A Callback function.
-This function is an after adivce for
+This function is an after advice for
 image-dired-[forward, backward]-image, image-dired-[previous, next]-line."
   (wallpreview--set-wallpaper))
 
 (defvar wallpreview--on nil
-  "If the value is not nil, wallpreivew is enabled.")
+  "If the value is not nil, wallpreview is enabled.")
 
 (defun wallpreview--enable ()
   "Turn on wallpreview."
@@ -115,15 +115,27 @@ image-dired-[forward, backward]-image, image-dired-[previous, next]-line."
       (wallpreview--disable)
     (wallpreview--enable)))
 
-(defun wallpreview--bind-toggle-key ()
-    "Toggle wallpreview."
-    (define-key
-      image-dired-thumbnail-mode-map
-      wallpreview-toggle-key
-      #'wallpreview--toggle))
-
-(add-hook 'image-dired-thumbnail-mode-hook
-	  #'wallpreview--bind-toggle-key)
+;;;###autoload
+(define-minor-mode wallpreview-mode
+  "Turn on wallpreview-mode."
+  :init-value nil ; Initial value, nil for disabled
+  :lighter " wallpreview"
+  :global t
+  (let ((map image-dired-thumbnail-mode-map)
+	(key wallpreview-toggle-key))
+      (if wallpreview-mode
+      (progn
+	(define-key
+	  map
+	  key
+	  #'wallpreview--toggle)
+	(wallpreview--enable))
+    (progn
+	(define-key
+	  map
+	  key
+	  nil)
+      (wallpreview--disable)))))
 
 (provide 'wallpreview)
 ;;; wallpreview.el ends here
