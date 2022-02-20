@@ -11,4 +11,3 @@
 (bind-key "m" 'transient-shikolenko-menu mpc-mode-map)
 
 (provide 'shikolenko)
-

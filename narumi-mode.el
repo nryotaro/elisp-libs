@@ -28,11 +28,12 @@
 ;; You can change the wallpaper to the image on the dashboard.
 ;; Since it is a dashboard,
 ;; you can go to the entries of bookmarks and recent files by clicking them.
+
+;;; Code:
+
 (require 'bookmark)
 (require 'recentf)
 (require 'seq)
-
-;;; Code:
 (defgroup narumi-mode nil
   "Yet another splash screen."
   :prefix "narumi-"
