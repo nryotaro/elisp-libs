@@ -24,7 +24,8 @@
 ;;; Commentary:
 
 ;; anejil automatically activates a Python venv.
-;; When you open a Python file, it searches for the venv directory near the file, and activates it.
+;; When you open a Python file,
+;; it searches for the venv directory near the file, and activates it.
 
 ;;; Code:
 (require 'pyvenv)
@@ -39,9 +40,6 @@
   "The patterns of venv directories that you want to activate."
   :type '(repeat string))
 
-
-
-
 (defun anejil--locate-venv
     (base-directory venv-dirname)
   "Search for a venv directory.
@@ -52,8 +50,9 @@ from `BASE-DIRECTORY'.  The behavior is similar to
 			  base-directory
 			  (anejil--resolve-activate
 			   venv-dirname))))
-    (concat (file-name-as-directory parent-dir)
-	    venv-dirname)))
+    (expand-file-name
+         (concat (file-name-as-directory parent-dir)
+	    venv-dirname))))
 
 
 (defun anejil--locate-venvs
@@ -75,7 +74,9 @@ Return a path of the venv directory or nil."
 			 default-directory
 			 anejil-venv-dirnames))
 	      (match (not (equal venv-dir pyvenv-virtual-env))))
-    nil))
+    (pyvenv-activate venv-dir)
+    (message (format "anejil activated %s."
+		     venv-dir))))
 
 (defun anejil--resolve-activate (directory)
   "Return the path of the activete file in `DIRECTORY'."
@@ -92,8 +93,6 @@ Return a path of the venv directory or nil."
   (if anejil-mode
       (add-hook hook #'anejil--run)
     (remove-hook hook #'anejil--run))))
-
-
 
 (provide 'anejil)
 ;;; anejil.el ends here
